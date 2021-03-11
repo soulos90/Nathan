@@ -24,8 +24,19 @@ SyncDB = {
     }
 };
 
+
 function JukeboxBackground:Constructor()
 	Turbine.UI.Lotro.Window.Constructor( self );
+    CommandsRef = {
+        {Command = "request",func = JukeboxBackground.PCRT}, 
+        {Command = "upvote",func = JukeboxBackground.PCUE}, 
+        {Command = "downvote",func = JukeboxBackground.PCDE}, 
+        {Command = "ready",func = JukeboxBackground.PCRY}, 
+        {Command = "useinstrument",func = JukeboxBackground.PCUI}, 
+        {Command = "playpart",func = JukeboxBackground.PCPP}, 
+        {Command = "broken",func = JukeboxBackground.PCBN}, 
+        {Command = "preference",func = JukeboxBackground.PCPE}
+    };
     previousGameTime = Turbine.Engine.GetGameTime();
     self.UnloadSet = false;
     self:SetWantsUpdates(true);
@@ -64,17 +75,64 @@ end
 
 ChatListener = function(sender, args)
 	if (args.ChatType==Turbine.ChatType.Say) or (args.ChatType==Turbine.ChatType.Tell) or (args.ChatType==Turbine.ChatType.Fellowship) or (args.ChatType==Turbine.ChatType.Raid) then
-		commandText = {};
-		numCommands = 1;
+		local commandText = {};
+		local numCommands = 1;
         Turbine.Shell.WriteLine("chat was read");
-        tempstring = args.Message;
+        local tempstring = args.Message;
         for w in string.gfind(tempstring, "!JB%(.-%)") do
+            w = string.gsub(w, "!JB%( *", "");
+            w = string.gsub(w, "%)", "");
             table.insert(commandText,w);
         end
         for i,v in ipairs(commandText) do
             Turbine.Shell.WriteLine(i .. v);
         end
+        if(#commandText ~= 0) then
+            for i,v in ipairs(commandText) do
+                for e,x in ipairs(CommandsRef) do
+                    j,k = string.find(v:lower(), x["Command"]);
+                    if(j==1) then
+                        local func = x["func"];
+                        local details = string.sub(v, k + 1);
+                        func(JukeboxBackground,details);
+                    end
+                end
+            end
+        end
 	end
+end
+
+--"request", "upvote", "downvote", "ready", "useinstrument", "playpart", "broken", "preference"
+function JukeboxBackground:PCRT(details)
+    Turbine.Shell.WriteLine("PCRT" .. details);
+end
+
+function JukeboxBackground:PCUE(details)
+    Turbine.Shell.WriteLine("PCUE" .. details);
+end
+
+function JukeboxBackground:PCDE(details)
+    Turbine.Shell.WriteLine("PCDE" .. details);
+end
+
+function JukeboxBackground:PCRY(details)
+    Turbine.Shell.WriteLine("PCRY" .. details);
+end
+
+function JukeboxBackground:PCUI(details)
+    Turbine.Shell.WriteLine("PCUI" .. details);
+end
+
+function JukeboxBackground:PCPP(details)
+    Turbine.Shell.WriteLine("PCPP" .. details);
+end
+
+function JukeboxBackground:PCBN(details)
+    Turbine.Shell.WriteLine("PCBN" .. details);
+end
+
+function JukeboxBackground:PCPE(details)
+    Turbine.Shell.WriteLine("PCPE" .. details);
 end
 
 function JukeboxBackground:Communicate()
