@@ -24,9 +24,25 @@ SyncDB = {
     }
 };
 
+testProgress = {
+    goingforward = true,
+    teststring = '%!',
+    snotNIl = {},
+    snotcount = 0,
+    anotNIl = {},
+    anotcount = 0
+};
+
 
 function JukeboxBackground:Constructor()
 	Turbine.UI.Lotro.Window.Constructor( self );
+    testProgress = Turbine.PluginData.Load( Turbine.DataScope.Account , "testProgress") or testProgress;
+    goingforward = testProgress.goingforward;
+    snotNil = testProgress.snotNIl;
+    snotcount = testProgress.snotcount;
+    anotNil = testProgress.anotNil;
+    anotcount = testProgress.anotcount;
+    teststring = testProgress.teststring;
     CommandsRef = {
         {Command = "request",func = JukeboxBackground.PCRT}, 
         {Command = "upvote",func = JukeboxBackground.PCUE}, 
@@ -50,8 +66,14 @@ function JukeboxBackground:UnloadMe()
     local a = Turbine.DataScope.Account;
     local b = "JukeBoxInput" .. inputID;
     local c = InputDB;
-    local d = FinishedInputSave(result, message);
-	PatchDataSave( a,b,c,d );
+	Turbine.PluginData.Save(a,b,c);
+    testProgress.teststring = teststring;
+    testProgress.goingforward = goingforward;
+    testProgress.snotNIl = snotNIl;
+    testProgress.snotcount = snotcount;
+    testProgress.anotNil = anotNil;
+    testProgress.anotcount = anotcount;
+    Turbine.PluginData.Save(Turbine.DataScope.Account , "testProgress", testProgress);
 end
 
 function JukeboxBackground:Update()
@@ -62,18 +84,86 @@ function JukeboxBackground:Update()
 		Plugins["Jukebox"].Unload = function(self,sender,args)
             JukeboxBackground:UnloadMe();
         end
-	end
+    end
 	local currentGameTime = Turbine.Engine.GetGameTime();
 	local delta = currentGameTime - previousGameTime;
 	if( delta > 10 ) then
         self:SetWantsUpdates(false);
         Turbine.Shell.WriteLine("Hi Im calling communicate");
 		
-		JukeboxBackground:Communicate();
+		--JukeboxBackground:Communicate();
 	end
 end
 
+function JukeboxBackground:getChar(num)
+    local val = '';
+    if(num == 34 or num == 39 or num == 92) then
+        val = '\\';
+    end
+    val = val .. string.char(num);
+    return val;
+end
+function JukeboxBackground:testerThing(sender,args,astring)
+    if(string.len(astring) > 0) then
+        if(sender[astring]~=nil) then
+            table.insert(snotNil,astring);
+            snotcount = snotcount + 1;
+        end
+        if(args[astring]~=nil) then
+            table.insert(anotNil,astring);
+            anotcount = anotcount + 1;
+        end
+        if(string.len(astring) < 20 and goingforward) then
+            teststring = astring .. JukeboxBackground:getChar(33);
+        else
+            inquestion = string.sub(astring,string.len(astring));
+            for i = 33, 126, 1 do
+                local v = JukeboxBackground:getChar(i);
+                if(inquestion == v and i < 126) then
+                    teststring = string.sub(astring,1,string.len(astring) - 1) .. JukeboxBackground:getChar(i + 1);
+                    break;
+                elseif(inquestion == v) then
+                    teststring = string.sub(astring,1,string.len(astring) - 1); 
+                    JukeboxBackground:backuploop(sender,args,teststring);
+                end
+            end
+        end
+    else
+        Turbine.Shell.WriteLine("finished testing snotcount " .. snotcount .. " anotcount " .. anotcount);
+        for i,v in ipairs(snotNil) do
+            Turbine.Shell.WriteLine("snot " .. i .. " " .. v);
+        end
+        for i,v in ipairs(anotNil) do
+            Turbine.Shell.WriteLine("anot " .. i .. " " .. v);
+        end
+    end
+end
+function JukeboxBackground:backuploop(sender,args,astring)
+    goingforward = false;
+    inquestion = string.sub(astring,string.len(astring));
+    for i = 33, 126, 1 do
+        local v = JukeboxBackground:getChar(i);
+        if(inquestion == v and i < 126) then
+            teststring = string.sub(astring,1,string.len(astring) - 1) .. JukeboxBackground:getChar(i + 1);
+            lastone = false;
+            break;
+        elseif(inquestion == v) then
+            teststring = string.sub(astring,1,string.len(astring) - 1); 
+            JukeboxBackground:backuploop(sender,args,teststring);
+        end
+    end
+end
+
 ChatListener = function(sender, args)
+    if((args.ChatType==Turbine.ChatType.Say) or (args.ChatType==Turbine.ChatType.Tell) or (args.ChatType==Turbine.ChatType.Fellowship) or 
+        (args.ChatType==Turbine.ChatType.Raid) or (args.ChatType==Turbine.ChatType.Kinship) or (args.ChatType==Turbine.ChatType.Officer) or 
+        (args.ChatType==Turbine.ChatType.Trade) or (args.ChatType==Turbine.ChatType.LFF) or (args.ChatType==Turbine.ChatType.Regional) or 
+        (args.ChatType==Turbine.ChatType.World) or (args.ChatType==Turbine.ChatType.UserChat1) or (args.ChatType==Turbine.ChatType.UserChat2) or 
+        (args.ChatType==Turbine.ChatType.UserChat3) or (args.ChatType==Turbine.ChatType.UserChat4) or (args.ChatType==Turbine.ChatType.UserChat5) or 
+        (args.ChatType==Turbine.ChatType.UserChat6) or (args.ChatType==Turbine.ChatType.UserChat7) or (args.ChatType==Turbine.ChatType.UserChat8) or 
+        (args.ChatType==Turbine.ChatType.Advice)) then
+        JukeboxBackground:testerThing(sender,args,teststring);
+    end
 	if (args.ChatType==Turbine.ChatType.Say) or (args.ChatType==Turbine.ChatType.Tell) or (args.ChatType==Turbine.ChatType.Fellowship) or (args.ChatType==Turbine.ChatType.Raid) then
 		local commandText = {};
 		local numCommands = 1;
@@ -82,19 +172,20 @@ ChatListener = function(sender, args)
         for w in string.gfind(tempstring, "!JB%(.-%)") do
             w = string.gsub(w, "!JB%( *", "");
             w = string.gsub(w, "%)", "");
-            table.insert(commandText,w);
+            local temp = {t = w, s = sender};
+            table.insert(commandText,temp);
         end
         for i,v in ipairs(commandText) do
-            Turbine.Shell.WriteLine(i .. v);
+            Turbine.Shell.WriteLine(i .. v["t"] .. v["s"]);
         end
         if(#commandText ~= 0) then
             for i,v in ipairs(commandText) do
                 for e,x in ipairs(CommandsRef) do
-                    j,k = string.find(v:lower(), x["Command"]);
+                    j,k = string.find(v["t"]:lower(), x["Command"]);
                     if(j==1) then
                         local func = x["func"];
-                        local details = string.sub(v, k + 1);
-                        func(JukeboxBackground,details);
+                        local details = string.sub(v["t"], k + 1);
+                        func(JukeboxBackground, details, v["s"]);
                     end
                 end
             end
@@ -103,35 +194,35 @@ ChatListener = function(sender, args)
 end
 
 --"request", "upvote", "downvote", "ready", "useinstrument", "playpart", "broken", "preference"
-function JukeboxBackground:PCRT(details)
+function JukeboxBackground:PCRT(details, sender)
     Turbine.Shell.WriteLine("PCRT" .. details);
 end
 
-function JukeboxBackground:PCUE(details)
+function JukeboxBackground:PCUE(details, sender)
     Turbine.Shell.WriteLine("PCUE" .. details);
 end
 
-function JukeboxBackground:PCDE(details)
+function JukeboxBackground:PCDE(details, sender)
     Turbine.Shell.WriteLine("PCDE" .. details);
 end
 
-function JukeboxBackground:PCRY(details)
+function JukeboxBackground:PCRY(details, sender)
     Turbine.Shell.WriteLine("PCRY" .. details);
 end
 
-function JukeboxBackground:PCUI(details)
+function JukeboxBackground:PCUI(details, sender)
     Turbine.Shell.WriteLine("PCUI" .. details);
 end
 
-function JukeboxBackground:PCPP(details)
+function JukeboxBackground:PCPP(details, sender)
     Turbine.Shell.WriteLine("PCPP" .. details);
 end
 
-function JukeboxBackground:PCBN(details)
+function JukeboxBackground:PCBN(details, sender)
     Turbine.Shell.WriteLine("PCBN" .. details);
 end
 
-function JukeboxBackground:PCPE(details)
+function JukeboxBackground:PCPE(details, sender)
     Turbine.Shell.WriteLine("PCPE" .. details);
 end
 
@@ -139,39 +230,39 @@ function JukeboxBackground:Communicate()
     Turbine.Shell.WriteLine("Hi Im Communicate");
 	SaveDone = false;
 	LoadDone = false;
-	self:PatchDataLoad( Turbine.DataScope.Account, "JukeBoxSync" .. LookingFor, FinishedSyncLoad(result, message));
-	self:PatchDataSave( Turbine.DataScope.Account, "JukeBoxInput" .. inputID, InputDB, FinishedInputSave(result, message));
+	PatchDataLoad( Turbine.DataScope.Account, "JukeBoxSync" .. LookingFor, JukeboxBackground.FinishedSyncLoad(result, message));
+	PatchDataSave( Turbine.DataScope.Account, "JukeBoxInput" .. inputID, InputDB, JukeboxBackground.FinishedInputSave(result, message));
 	inputID = (inputID + 1) % 1000;
 end
 
-function FinishedSyncLoad(result, message)
+function JukeboxBackground.FinishedSyncLoad(result, message)
     Turbine.Shell.WriteLine("Hi Im FinishedSyncLoad");
 	if ( result ) then
         Turbine.Shell.WriteLine("Hi Im FinishedSyncLoad with true result");
-		if IsTidy(message) then
-			ProcessSync(message);
+		if JukeboxBackground:IsTidy(message) then
+			JukeboxBackground:ProcessSync(message);
 			LookingFor = (LookingFor + 1) % 1000;
 			InputDB.LookingFor = LookingFor;
-			PatchDataLoad( Turbine.DataScope.Account, "JukeBoxSync" .. LookingFor, FinishedSyncLoad(result, message));
+			PatchDataLoad( Turbine.DataScope.Account, "JukeBoxSync" .. LookingFor, JukeboxBackground.FinishedSyncLoad(result, message));
 		else
-			FinishedCommunicate(2);
+			JukeboxBackground:FinishedCommunicate(2);
         end
 	else
 		Turbine.Shell.WriteLine( "<rgb=#FF0000> sync not found</rgb>" );
-		FinishedCommunicate(2);
+		JukeboxBackground:FinishedCommunicate(2);
 	end
 end
 
-function FinishedInputSave(result, message)
+function JukeboxBackground.FinishedInputSave(result, message)
 	if ( result ) then
 		Turbine.Shell.WriteLine( "<rgb=#00FF00> input saved </rgb>");
 	else
 		Turbine.Shell.WriteLine( "<rgb=#FF0000> input not saved</rgb>" );
 	end
-	FinishedCommunicate(1);
+	JukeboxBackground:FinishedCommunicate(1);
 end
 
-function FinishedCommunicate(sender)
+function JukeboxBackground:FinishedCommunicate(sender)
 	if(sender == 1) then
 		SaveDone = true;
 	else
@@ -181,12 +272,12 @@ function FinishedCommunicate(sender)
 		previousGameTime = Turbine.Engine.GetGameTime();
 		Self:SetWantsUpdates(true);
 		if(TimeToLoadSongs) then
-			LoadSongs();
+			JukeboxBackground:LoadSongs();
 		end
 	end
 end
 
-function FinishedSongLoad(result, message)
+function JukeboxBackground.FinishedSongLoad(result, message)
     if(result) then
         SongDB = result;
     end
@@ -202,26 +293,26 @@ function FinishedSongLoad(result, message)
     JukeboxWindow:SetDB(SongDB);
 end
 
-function ProcessSync(data)
+function JukeboxBackground:ProcessSync(data)
 	SyncDB = data;
 	if(data.LoadSongs) then
 		TimeToLoadSongs = true;
 	end
 	for i,v in ipairs(SyncDB.Commands) do 
-        CommandSwitch(v); 
+        JukeboxBackground:CommandSwitch(v); 
     end
 end
 
-function LoadSongs()
-    PatchDataLoad( Turbine.DataScope.Account , "JukeBoxData", FinishedSongLoad);
+function JukeboxBackground:LoadSongs()
+    PatchDataLoad( Turbine.DataScope.Account , "JukeBoxData", JukeboxBackground.FinishedSongLoad);
     Turbine.Shell.WriteLine("LoadSongs");
 end
 
-function CommandSwitch(command)
+function JukeboxBackground:CommandSwitch(command)
 	
 end
 
-function IsTidy(data)
+function JukeboxBackground:IsTidy(data)
 	--TODO: check if file is complete
 	return true;
 end
